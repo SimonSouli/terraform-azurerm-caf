@@ -25,13 +25,13 @@ resource "azurerm_synapse_workspace" "ws" {
   tags                                 = local.tags
 
   dynamic "identity" {
-    for_each = try(var.settings.identity, null) != null ? [var.settings.identity] : []
+    for_each = can(var.settings.identity) ? [var.settings.identity] : []
     content {
       type         = identity.value.type
       identity_ids = concat(local.managed_identities, try(identity.value.identity_ids, []))
     }
   }
-
+  
   dynamic "aad_admin" {
     for_each = try(var.settings.aad_admin, null) != null ? [var.settings.aad_admin] : []
     content {
