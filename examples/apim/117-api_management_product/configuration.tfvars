@@ -30,10 +30,8 @@ api_management_product = {
     resource_group = {
       key = "rg1"
     }
-    product_id            = "example-product1"
-    display_name          = "Example Product 1"
-    subscription_required = false
-    published             = false
+    product_id   = "example-product1"
+    display_name = "Example Product 1"
   }
   example_product2 = {
     api_management = {
