@@ -24,8 +24,12 @@ resource "azurerm_synapse_workspace" "ws" {
   data_exfiltration_protection_enabled = try(var.settings.data_exfiltration_protection_enabled, null)
   tags                                 = local.tags
 
-  identity {
-    type = "SystemAssigned"
+  dynamic "identity" {
+    for_each = try(var.settings.identity, null) != null ? [var.settings.identity] : []
+    content {
+      type         = identity.value.type
+      identity_ids = concat(local.managed_identities, try(identity.value.identity_ids, []))
+    }
   }
 
   dynamic "aad_admin" {
@@ -45,15 +49,7 @@ resource "azurerm_synapse_workspace" "ws" {
       tenant_id = try(sql_aad_admin.value.tenant_id, null)
     }
   }
-
-  dynamic "identity" {
-    for_each = can(var.settings.identity) ? [var.settings.identity] : []
-    content {
-      type         = identity.value.type
-      identity_ids = concat(local.managed_identities, try(identity.value.identity_ids, []))
-    }
-  }
-
+  
   dynamic "customer_managed_key" {
     for_each = try(var.settings.customer_managed_key_versionless_id, null) == null ? [] : [1]
 
