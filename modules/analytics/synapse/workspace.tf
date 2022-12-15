@@ -24,13 +24,13 @@ resource "azurerm_synapse_workspace" "ws" {
   data_exfiltration_protection_enabled = try(var.settings.data_exfiltration_protection_enabled, null)
   tags                                 = local.tags
 
-  dynamic "identity" {
-    for_each = can(var.settings.identity) ? [var.settings.identity] : []
-    content {
-      type         = identity.value.type
-      identity_ids = concat(local.managed_identities, try(identity.value.identity_ids, []))
-    }
-  }
+  # dynamic "identity" {
+  #   for_each = can(var.settings.identity) ? [var.settings.identity] : []
+  #   content {
+  #     type         = identity.value.type
+  #     identity_ids = concat(local.managed_identities, try(identity.value.identity_ids, []))
+  #   }
+  # }
   
   dynamic "aad_admin" {
     for_each = try(var.settings.aad_admin, null) != null ? [var.settings.aad_admin] : []
