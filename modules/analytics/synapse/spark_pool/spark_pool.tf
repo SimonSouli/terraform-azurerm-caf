@@ -40,7 +40,7 @@ resource "azurerm_synapse_spark_pool" "spark_pool" {
   }
   dynamic "spark_config" {
     
-    for_each = try(var.settings.spark_config, null)!= null ? var.settings.spark_config : {}
+    for_each = try(var.settings.spark_config, null)!= null ? var.settings.spark_config : null
 
     content {
       content  = var.settings.spark_config.content
