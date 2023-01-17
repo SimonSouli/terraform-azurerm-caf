@@ -40,10 +40,9 @@ resource "azurerm_synapse_spark_pool" "spark_pool" {
   }
   dynamic "spark_config" {    
     for_each = try(var.settings.spark_config, null) != null ? [var.settings.spark_config] : []
-
     content {
-      content  =  try(spark_config.content, null)
-      filename = try(spark_config.filename, null)
+      content  =  try(spark_config.value.content, null)
+      filename = try(spark_config.value.filename, null)
     }
   }
   tags = local.tags
