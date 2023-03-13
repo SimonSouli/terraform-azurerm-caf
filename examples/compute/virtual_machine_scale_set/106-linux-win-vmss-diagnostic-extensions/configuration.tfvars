@@ -1,27 +1,55 @@
 global_settings = {
   default_region = "region1"
   regions = {
-    region1 = "australiaeast"
+    region1 = "southeastasia"
   }
-  resource_defaults = {
-    virtual_machine_scale_sets = {
-      # set the below to enable az managed boot diagostics for vms
-      # this will be override if a user managed storage account is defined for the vm
-      # use_azmanaged_storage_for_boot_diagnostics = true
-    }
-  }
+}
+
+tags = {
+  level = "100"
 }
 
 resource_groups = {
   rg1 = {
-    name = "vmss-agw-exmp-rg"
+    name = "vmss-lb-cse-rg"
   }
 }
 
-managed_identities = {
-  example_mi = {
-    name               = "example_mi"
+storage_accounts = {
+  sa1 = {
+    name               = "sa1"
     resource_group_key = "rg1"
+    # Account types are BlobStorage, BlockBlobStorage, FileStorage, Storage and StorageV2. Defaults to StorageV2
+    #account_kind = "BlobStorage"
+    # Account Tier options are Standard and Premium. For BlockBlobStorage and FileStorage accounts only Premium is valid.
+    account_tier = "Standard"
+    #  Valid options are LRS, GRS, RAGRS, ZRS, GZRS and RAGZRS
+    account_replication_type = "LRS" # https://docs.microsoft.com/en-us/azure/storage/common/storage-redundancy
+    containers = {
+      files = {
+        name = "files"
+      }
+    }
+  }
+}
+
+# Give managed identity Storage Blob Data reader and executing user Storage Blob Data Contributor permissions on storage account
+role_mapping = {
+  built_in_role_mapping = {
+    storage_accounts = {
+      sa1 = {
+        "Storage Blob Data Reader" = {
+          managed_identities = {
+            keys = ["user_mi"]
+          }
+        }
+        "Storage Blob Data Contributor" = {
+          logged_in = {
+            keys = ["user"]
+          }
+        }
+      }
+    }
   }
 }
 
@@ -38,21 +66,18 @@ vnets = {
         name = "compute"
         cidr = ["10.100.1.0/24"]
       }
-      subnet2 = {
-        name = "appgw"
-        cidr = ["10.100.2.0/24"]
-      }
     }
-
   }
 }
 
-
 keyvaults = {
-  kv1 = {
-    name               = "gwexmpkv"
+  example_vm_rg1 = {
+    name               = "vmsecretskv"
     resource_group_key = "rg1"
     sku_name           = "standard"
+    tags = {
+      env = "Standalone"
+    }
     creation_policies = {
       logged_in_user = {
         secret_permissions = ["Set", "Get", "List", "Delete", "Purge", "Recover"]
@@ -61,11 +86,24 @@ keyvaults = {
   }
 }
 
+# Store output attributes into keyvault secret
+dynamic_keyvault_secrets = {
+  example_vm_rg1 = { # Key of the keyvault
+    vmadmin-username = {
+      secret_name = "vmadmin-username"
+      value       = "vmadmin"
+    }
+    vmadmin-password = {
+      secret_name = "vmadmin-password"
+      value       = "Very@Str5ngP!44w0rdToChaNge#"
+    }
+  }
+}
 
 diagnostic_storage_accounts = {
   # Stores boot diagnostic for region1
   bootdiag1 = {
-    name                     = "labootdiag1"
+    name                     = "lebootdiag1"
     resource_group_key       = "rg1"
     account_kind             = "StorageV2"
     account_tier             = "Standard"
@@ -79,145 +117,64 @@ application_security_groups = {
   app_sg1 = {
     resource_group_key = "rg1"
     name               = "app_sg1"
-
   }
 }
 
-
-# AppGW
+# Load Balancer
 public_ip_addresses = {
-  agw_pip = {
-    name                    = "agw_pip1"
-    resource_group_key      = "rg1"
-    sku                     = "Standard"
-    allocation_method       = "Static"
+  lb_pip1 = {
+    name               = "lb_pip1"
+    resource_group_key = "rg1"
+    sku                = "Basic"
+    # Note: For UltraPerformance ExpressRoute Virtual Network gateway, the associated Public IP needs to be sku "Basic" not "Standard"
+    allocation_method = "Dynamic"
+    # allocation method needs to be Dynamic
+    ip_version              = "IPv4"
+    idle_timeout_in_minutes = "4"
+  }
+  lb_pip2 = {
+    name               = "lb_pip2"
+    resource_group_key = "rg1"
+    sku                = "Basic"
+    # Note: For UltraPerformance ExpressRoute Virtual Network gateway, the associated Public IP needs to be sku "Basic" not "Standard"
+    allocation_method = "Dynamic"
+    # allocation method needs to be Dynamic
     ip_version              = "IPv4"
     idle_timeout_in_minutes = "4"
   }
 }
 
-application_gateways = {
-  agw1 = {
-    resource_group_key = "rg1"
-    name               = "app_gateway_example"
-    vnet_key           = "vnet1"
-    subnet_key         = "subnet2"
-    sku_name           = "Standard_v2"
-    sku_tier           = "Standard_v2"
-    capacity = {
-      autoscale = {
-        minimum_scale_unit = 0
-        maximum_scale_unit = 10
-      }
-    }
-    zones        = ["1"]
-    enable_http2 = true
-
-    front_end_ip_configurations = {
-      public = {
-        name          = "public"
-        public_ip_key = "agw_pip"
-      }
-      private = {
-        name                          = "private"
-        vnet_key                      = "vnet1"
-        subnet_key                    = "subnet2"
-        subnet_cidr_index             = 0 # It is possible to have more than one cidr block per subnet
-        private_ip_offset             = 4 # e.g. cidrhost(10.10.0.0/25,4) = 10.10.0.4 => AGW private IP address
-        private_ip_address_allocation = "Static"
-      }
-    }
-
-    front_end_ports = {
-      80 = {
-        name     = "http"
-        port     = 80
-        protocol = "Http"
-      }
-      443 = {
-        name     = "https"
-        port     = 443
-        protocol = "Https"
+# Public Load Balancer will be created. For Internal/Private Load Balancer config, please refer 102-internal-load-balancer example.
+load_balancers = {
+  lb1 = {
+    name                      = "lb-vmss"
+    sku                       = "Basic"
+    resource_group_key        = "rg1"
+    backend_address_pool_name = "vmss1"
+    frontend_ip_configurations = {
+      config1 = {
+        name                  = "config1"
+        public_ip_address_key = "lb_pip1"
       }
     }
   }
-}
-
-application_gateway_applications = {
-  myapp = {
-
-    application_gateway_key = "agw1"
-    name                    = "myapp"
-
-    listeners = {
-      private = {
-        name                           = "myapp-80"
-        front_end_ip_configuration_key = "private"
-        front_end_port_key             = "80"
-        host_name                      = "cafdemo.internal"
-        request_routing_rule_key       = "default"
+  lb2 = {
+    name                      = "lb-vmss2"
+    sku                       = "Basic"
+    resource_group_key        = "rg1"
+    backend_address_pool_name = "vmss1"
+    frontend_ip_configurations = {
+      config1 = {
+        name                  = "config1"
+        public_ip_address_key = "lb_pip2"
       }
     }
-
-    request_routing_rules = {
-      default = {
-        rule_type = "Basic"
-        priority  = 100
-      }
-    }
-
-    backend_http_setting = {
-      port                                = 443
-      protocol                            = "Https"
-      pick_host_name_from_backend_address = true
-    }
-
-    # backend_pool = {
-    #   fqdns = ["test.com"]
-    # }
-
-  }
-  myapp2 = {
-
-    application_gateway_key = "agw1"
-    name                    = "myapp2"
-
-    listeners = {
-      private = {
-        name                           = "myapp2-80"
-        front_end_ip_configuration_key = "private"
-        front_end_port_key             = "80"
-        host_name                      = "cafdemo2.internal"
-        request_routing_rule_key       = "default"
-      }
-    }
-
-    request_routing_rules = {
-      default = {
-        rule_type = "Basic"
-        priority  = 101
-      }
-    }
-
-    backend_http_setting = {
-      port                                = 443
-      protocol                            = "Https"
-      pick_host_name_from_backend_address = true
-    }
-
-    # backend_pool = {
-    #   fqdns = ["test2.com"]
-    # }
-
   }
 }
 
 virtual_machine_scale_sets = {
   vmss1 = {
-    resource_group_key = "rg1"
-    # when boot_diagnostics_storage_account_key is empty string "", boot diagnostics will be put on azure managed storage
-    # when boot_diagnostics_storage_account_key is a non-empty string, it needs to point to the key of a user managed storage defined in diagnostic_storage_accounts
-    # if boot_diagnostics_storage_account_key is not defined, but global_settings.resource_defaults.virtual_machine_scale_sets.use_azmanaged_storage_for_boot_diagnostics is true, boot diagnostics will be put on azure managed storage
+    resource_group_key                   = "rg1"
     boot_diagnostics_storage_account_key = "bootdiag1"
     os_type                              = "linux"
     keyvault_key                         = "kv1"
@@ -250,7 +207,6 @@ virtual_machine_scale_sets = {
         #   enable_automatic_os_upgrade = true
         # }
 
-
         os_disk = {
           caching              = "ReadWrite"
           storage_account_type = "Standard_LRS"
@@ -259,17 +215,6 @@ virtual_machine_scale_sets = {
           # lz_key = ""
         }
 
-        identity = {
-          # type = "SystemAssigned"
-          type                  = "UserAssigned"
-          managed_identity_keys = ["example_mi"]
-
-          remote = {
-            lz_key_name = {
-              managed_identity_keys = []
-            }
-          }
-        }
 
         # custom_image_id = ""
 
@@ -279,12 +224,6 @@ virtual_machine_scale_sets = {
           sku       = "18.04-LTS"
           version   = "latest"
         }
-
-        # plan = {
-        #   name      = ""
-        #   publisher = ""
-        #   product   = ""
-        # }
 
       }
     }
@@ -298,20 +237,10 @@ virtual_machine_scale_sets = {
         primary    = true
         vnet_key   = "vnet1"
         subnet_key = "subnet1"
-        # modify the following to handling multiple lbs, appgw, asg
-
-        # load_balancers = {
-        #   lb1 = {
-        #     lb_key = ""
-        #     lz_key = ""
-        #   }
-        # }
-
-        appgw_backend_pools = {
-          appgw1 = {
-            appgw_key = "agw1"
+        load_balancers = {
+          lb1 = {
+            lb_key = "lb1"
             # lz_key = ""
-            pool_names = ["myapp"]
           }
         }
 
@@ -328,7 +257,6 @@ virtual_machine_scale_sets = {
       }
     }
 
-
     data_disks = {
       data1 = {
         caching                   = "None"  # None / ReadOnly / ReadWrite
@@ -344,6 +272,16 @@ virtual_machine_scale_sets = {
       }
     }
 
+    virtual_machine_scale_set_extensions = {
+      da_extension = {
+        name                       = "DAExtension"
+        publisher                  = "Microsoft.Azure.Monitoring.DependencyAgent"
+        type                       = "DependencyAgentLinux"
+        type_handler_version       = "9.5"
+        auto_upgrade_minor_version = false
+      }
+
+    }
   }
 
   vmss2 = {
@@ -385,10 +323,6 @@ virtual_machine_scale_sets = {
           disk_size_gb         = 128
         }
 
-        identity = {
-          type                  = "SystemAssigned"
-          managed_identity_keys = []
-        }
 
         source_image_reference = {
           publisher = "MicrosoftWindowsServer"
@@ -408,11 +342,10 @@ virtual_machine_scale_sets = {
         vnet_key   = "vnet1"
         subnet_key = "subnet1"
 
-        appgw_backend_pools = {
-          appgw1 = {
-            appgw_key = "agw1"
+        load_balancers = {
+          lb2 = {
+            lb_key = "lb2"
             # lz_key = ""
-            pool_names = ["myapp2"]
           }
         }
 
@@ -445,6 +378,14 @@ virtual_machine_scale_sets = {
       }
     }
 
-  }
+    virtual_machine_scale_set_extensions = {
+      microsoft_azure_domainjoin = {
+        domain_name = "test.local"
+        ou_path     = "OU=test,DC=test,DC=local"
+        restart     = "true"
+        # specify the AKV location of the password to retrieve for domain join operation
+      }
+    }
 
+  }
 }
