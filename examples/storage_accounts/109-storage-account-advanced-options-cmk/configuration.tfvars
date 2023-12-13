@@ -5,6 +5,10 @@ global_settings = {
   }
 }
 
+provider_azurerm_features_keyvault = {
+  purge_soft_delete_on_destroy = false
+}
+
 resource_groups = {
   test = {
     name = "test"
@@ -165,7 +169,7 @@ keyvault_access_policies = {
   kv1 = {
     logged_in_user = {
       secret_permissions = ["Set", "Get", "List", "Delete", "Purge", "Recover"]
-      key_permissions    = ["Decrypt", "Encrypt", "Sign", "UnwrapKey", "Verify", "WrapKey", "List", "Get", "Create", "Purge", "Delete"]
+      key_permissions    = ["Decrypt", "Encrypt", "Sign", "UnwrapKey", "Verify", "WrapKey", "List", "Get", "Create", "Purge", "Delete", "GetRotationPolicy"]
     }
     storage_accounts = {
       storage_account_key = "sa1"

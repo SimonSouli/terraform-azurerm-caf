@@ -3,37 +3,41 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.45.0"
+      version = "~> 3.75.0"
       configuration_aliases = [
         azurerm.vhub
       ]
     }
     azuread = {
       source  = "hashicorp/azuread"
-      version = "~> 1.4.0"
+      version = "~> 2.43.0"
     }
     azapi = {
       source  = "azure/azapi"
-      version = "~> 1.3.0"
+      version = "~> 1.6.0"
     }
     azurecaf = {
       source  = "aztfmod/azurecaf"
-      version = "1.2.24-preview"
+      version = "~> 1.2.0"
     }
     null = {
       source = "hashicorp/null"
     }
     random = {
-      version = "~> 3.3.1"
+      version = "~> 3.5.1"
       source  = "hashicorp/random"
     }
   }
-  required_version = ">= 1.1.0"
+  required_version = ">= 1.3.5"
 }
 
+provider "azapi" {
+  skip_provider_registration = true
+}
 
 data "azurerm_subscription" "primary" {}
 data "azurerm_client_config" "current" {}
+data "azuread_client_config" "current" {}
 
 # The rover handle the identity management transition to cover interactive run and execution on pipelines using azure ad applications or managed identities
 # There are different scenrios are considered:
@@ -46,5 +50,5 @@ data "azurerm_client_config" "current" {}
 
 data "azuread_service_principal" "logged_in_app" {
   count          = var.logged_aad_app_objectId == null ? 0 : 1
-  application_id = data.azurerm_client_config.current.client_id
+  application_id = data.azuread_client_config.current.client_id
 }
